@@ -1,0 +1,11 @@
+.build
+.mbed
+projectfiles
+*.py*
+mbed-os
+BUILD
+
+.clangd
+compile_commands.json
+.cache
+BSP_DISCO_F746NG
