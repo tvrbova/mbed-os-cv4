@@ -1,8 +1,9 @@
 #include "mbed.h"
 #include "lcd.h"
+#include <time.h>
 #include <algorithm>
 
-#define BOMB_TIME 60
+const uint32_t BOMB_TIME = 100000;
 #define EXPLODE_TIME 1000ms
 Ticker timer_ticker;
 
@@ -12,7 +13,7 @@ Ticker timer_ticker;
 #define FLAG_STOP (1UL << 3)
 
 char tlac[3] = {'r', 's', 'e'};
-uint32_t colors[3] = {LCD_COLOR_RED, LCD_COLOR_GREEN, LCD_COLOR_YELLOW};
+uint32_t colors[] = {LCD_COLOR_RED, LCD_COLOR_GREEN, LCD_COLOR_YELLOW};
 EventFlags event_flags;
 
 Mutex lcd_mutex, flags_mutex;
@@ -26,9 +27,7 @@ Thread th_timer, th_touch;
 
 void update_display()
 {
-    lcd_mutex.lock();
-    update_timer(watchdog.get_timeout());
-    lcd_mutex.unlock();
+    update_timer(watchdog.get_timeout()/10000);
 }
 
 void start_display_timer() {
@@ -138,30 +137,39 @@ void wait_for_stop() {
     uint32_t flags_read = 0;
     while (1) {
         flags_read = event_flags.wait_any(FLAG_STOP);
-        watchdog.stop();
 
+        while (true) {
+            watchdog.kick();
+        }
+        
         set_default_flag();
     }
 }
 
 void init() {
+    srand(time(NULL));
     lcd_mutex.lock();
     init_display();
     lcd_mutex.unlock();
 
-    flags_mutex.lock();
-    event_flags.set(FLAG_DEFAULT);
-    flags_mutex.unlock();
+    set_default_flag();
 
-    watchdog.start(BOMB_TIME);
     reset_display();
+    
+    update_timer(10);
+    watchdog.start(BOMB_TIME);
+    
 }
 
 
 
 int main()
 {
-    init();
+
+
+    init() ;
+
+    watchdog.kick();
 
     th_timer.start(start_display_timer);
     th_touch.start(start_touch_detection);
