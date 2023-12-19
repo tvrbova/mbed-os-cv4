@@ -24,6 +24,7 @@ void color_segment(int segment, uint32_t color) {
 
 
 void update_timer(int time) {
+    color_segment(0, LCD_COLOR_BLACK);
     BSP_LCD_SetTextColor(LCD_COLOR_RED);
     char time_str[6];
     sprintf(time_str, "%2d:%2d", (time / 60), (time % 60));

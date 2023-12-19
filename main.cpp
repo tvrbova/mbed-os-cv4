@@ -1,9 +1,9 @@
 #include "mbed.h"
 #include "lcd.h"
 #include <time.h>
-#include <algorithm>
+//#include <algorithm>
 
-const uint32_t BOMB_TIME = 100000;
+const uint32_t BOMB_TIME = 10000;
 #define EXPLODE_TIME 1000ms
 Ticker timer_ticker;
 
@@ -20,14 +20,20 @@ Mutex lcd_mutex, flags_mutex;
 Watchdog &watchdog = Watchdog::get_instance();
 
 Thread th_explode, th_reset, th_stop;
-// jedno tlacitko watchdog kick, jinek stop, jine spusti sekvemci exploze a kick
-Thread th_timer, th_touch;
+Thread th_touch;
+
+int testcas = 10000;
+DigitalOut led1(LED1);
 
 //https://os.mbed.com/teams/ST/code/DISCO-F746NG_LCDTS_demo//file/9f66aabe7b3b/main.cpp/ detekovani dotyku displaye
 
 void update_display()
 {
-    update_timer(watchdog.get_timeout()/10000);
+    testcas --;
+    //led1 = !led1;
+    flags_mutex.lock();
+    update_timer((int)(testcas/1000));
+    flags_mutex.unlock();
 }
 
 void start_display_timer() {
@@ -85,8 +91,8 @@ void start_touch_detection() {
 }
 
 void reset_display() {
-    random_shuffle(&tlac[0], &tlac[3]);
-    random_shuffle(&colors[0], &colors[3]);
+    //random_shuffle(&tlac[0], &tlac[3]);
+    //random_shuffle(&colors[0], &colors[3]);
     for (int i = 0; i < 3; i++) {
         lcd_mutex.lock();
         color_segment((i+1), colors[i]);
@@ -147,6 +153,7 @@ void wait_for_stop() {
 }
 
 void init() {
+    
     srand(time(NULL));
     lcd_mutex.lock();
     init_display();
@@ -158,20 +165,18 @@ void init() {
     
     update_timer(10);
     watchdog.start(BOMB_TIME);
-    
+   
 }
 
 
 
 int main()
 {
-
-
+    led1 = 0;
     init() ;
-
     watchdog.kick();
 
-    th_timer.start(start_display_timer);
+    start_display_timer();
     th_touch.start(start_touch_detection);
     th_explode.start(wait_for_explode);
     th_reset.start(wait_for_reset);
