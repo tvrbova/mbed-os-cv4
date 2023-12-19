@@ -1,7 +1,6 @@
 #include "mbed.h"
 #include "lcd.h"
 #include <time.h>
-//#include <algorithm>
 
 const uint32_t BOMB_TIME = 10000;
 #define EXPLODE_TIME 1000ms
@@ -13,7 +12,7 @@ Ticker timer_ticker;
 #define FLAG_STOP (1UL << 3)
 
 char tlac[3] = {'r', 's', 'e'};
-uint32_t colors[] = {LCD_COLOR_RED, LCD_COLOR_GREEN, LCD_COLOR_YELLOW};
+char colors[3] = {'r', 'g', 'y'};
 EventFlags event_flags;
 
 Mutex lcd_mutex, flags_mutex;
@@ -22,22 +21,11 @@ Watchdog &watchdog = Watchdog::get_instance();
 Thread th_explode, th_reset, th_stop;
 Thread th_touch;
 
-int testcas = 10000;
-DigitalOut led1(LED1);
-
-//https://os.mbed.com/teams/ST/code/DISCO-F746NG_LCDTS_demo//file/9f66aabe7b3b/main.cpp/ detekovani dotyku displaye
-
 void update_display()
 {
-    testcas --;
-    //led1 = !led1;
     flags_mutex.lock();
-    update_timer((int)(testcas/1000));
+    update_timer((int)(watchdog.get_timeout()/1000));
     flags_mutex.unlock();
-}
-
-void start_display_timer() {
-    timer_ticker.attach(&update_display, 10ms);
 }
 
 void start_touch_detection() {
@@ -90,12 +78,38 @@ void start_touch_detection() {
     }
 }
 
+void shuffle_char(char *array, size_t n)
+{
+    if (n > 1) 
+    {
+        size_t i;
+        for (i = 0; i < n - 1; i++) 
+        {
+          size_t j = i + rand() / (RAND_MAX / (n - i) + 1);
+          char t = array[j];
+          array[j] = array[i];
+          array[i] = t;
+        }
+    }
+}
+
 void reset_display() {
-    //random_shuffle(&tlac[0], &tlac[3]);
-    //random_shuffle(&colors[0], &colors[3]);
+    shuffle_char(tlac, 3);
+    shuffle_char(colors, 3);
     for (int i = 0; i < 3; i++) {
         lcd_mutex.lock();
-        color_segment((i+1), colors[i]);
+        uint32_t color;
+        switch (colors[i]) {
+            case 'r':
+                color = LCD_COLOR_RED; break;
+            case 'g':
+                color = LCD_COLOR_GREEN; break;
+            case 'y':
+                color = LCD_COLOR_YELLOW; break;
+            default:
+                color = LCD_COLOR_BLUE; break;
+        }
+        color_segment((i+1), color);
         lcd_mutex.unlock();
     }
 }
@@ -121,7 +135,7 @@ void wait_for_explode() {
         lcd_mutex.lock();
         clear_display();
         lcd_mutex.unlock();
-        start_display_timer();
+        timer_ticker.attach(&update_display, 10ms);
 
         watchdog.kick();
         reset_display();
@@ -153,7 +167,6 @@ void wait_for_stop() {
 }
 
 void init() {
-    
     srand(time(NULL));
     lcd_mutex.lock();
     init_display();
@@ -165,25 +178,20 @@ void init() {
     
     update_timer(10);
     watchdog.start(BOMB_TIME);
-   
 }
 
 
 
 int main()
 {
-    led1 = 0;
-    init() ;
-    watchdog.kick();
-
-    start_display_timer();
+    init();
+    timer_ticker.attach(&update_display, 10ms);
     th_touch.start(start_touch_detection);
     th_explode.start(wait_for_explode);
     th_reset.start(wait_for_reset);
     th_stop.start(wait_for_stop);
 
     while (true) {
-
     }
 }
 
